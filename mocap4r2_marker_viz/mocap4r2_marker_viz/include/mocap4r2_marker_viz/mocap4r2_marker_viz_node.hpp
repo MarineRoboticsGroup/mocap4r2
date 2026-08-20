@@ -19,6 +19,7 @@
 #define MOCAP4R2_MARKER_VIZ__MOCAP4R2_MARKER_VIZ_NODE_HPP_
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <map>
 #include <string>
@@ -56,8 +57,15 @@ private:
     const std_msgs::msg::Header & header) const;
 
   visualization_msgs::msg::Marker rb2visual(
-    int index, const geometry_msgs::msg::Pose & poserb,
+    const mocap4r2_msgs::msg::RigidBody & rb,
     const std_msgs::msg::Header & header) const;
+
+  visualization_msgs::msg::Marker rbLabel2visual(
+    const mocap4r2_msgs::msg::RigidBody & rb,
+    const std_msgs::msg::Header & header) const;
+
+  std_msgs::msg::ColorRGBA rigidBodyColor(const std::string & name) const;
+  std::string rigidBodyNamespace(const std::string & name) const;
 
   geometry_msgs::msg::Pose mocap2rviz(const geometry_msgs::msg::Pose mocap4r2_pose) const;
 
@@ -69,6 +77,8 @@ private:
 
   geometry_msgs::msg::Vector3 marker_scale_;
   float marker_lifetime_;
+  double rigid_body_label_height_;
+  double rigid_body_label_offset_;
   std::string namespace_;
   std::string mocap4r2_system_;
   std_msgs::msg::ColorRGBA default_marker_color_;

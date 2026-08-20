@@ -15,6 +15,8 @@
 // Author: David Vargas Frutos <david.vargas@urjc.es>
 // Author: Jose Miguel Guerrero Hernandez <josemiguel.guerrero@urjc.es>
 
+#include <cmath>
+#include <cstdint>
 #include <string>
 
 #include "mocap4r2_marker_viz/mocap4r2_marker_viz_node.hpp"
@@ -36,6 +38,8 @@ MarkerVisualizer::MarkerVisualizer()
   declare_parameter<double>("marker_scale_y", 0.014f);
   declare_parameter<double>("marker_scale_z", 0.014f);
   declare_parameter<float>("marker_lifetime", 0.01f);
+  declare_parameter<double>("rigid_body_label_height", 0.12);
+  declare_parameter<double>("rigid_body_label_offset", 0.15);
   declare_parameter<std::string>("namespace", "mocap4r2_markers");
   declare_parameter<std::string>("mocap4r2_system", "optitrack");
 
@@ -47,6 +51,8 @@ MarkerVisualizer::MarkerVisualizer()
   get_parameter<double>("marker_scale_y", marker_scale_.y);
   get_parameter<double>("marker_scale_z", marker_scale_.z);
   get_parameter<float>("marker_lifetime", marker_lifetime_);
+  get_parameter<double>("rigid_body_label_height", rigid_body_label_height_);
+  get_parameter<double>("rigid_body_label_offset", rigid_body_label_offset_);
   get_parameter<std::string>("namespace", namespace_);
   get_parameter<std::string>("mocap4r2_system", mocap4r2_system_);
 
@@ -136,18 +142,20 @@ MarkerVisualizer::rb_callback(const mocap4r2_msgs::msg::RigidBodies::SharedPtr m
     return;
   }
 
-  static int counter_rb = 0;
-  static int counter_markers_rb = 0;
   visualization_msgs::msg::MarkerArray visual_markers_rb;
 
   for (const mocap4r2_msgs::msg::RigidBody & rb : msg->rigidbodies) {
-    visual_markers_rb.markers.push_back(rb2visual(counter_rb++, rb.pose, msg->header));
+    const auto color = rigidBodyColor(rb.rigid_body_name);
+    const auto rb_namespace = rigidBodyNamespace(rb.rigid_body_name);
+    visual_markers_rb.markers.push_back(rb2visual(rb, msg->header));
+    visual_markers_rb.markers.push_back(rbLabel2visual(rb, msg->header));
 
+    int marker_id = 2;
     for (const mocap4r2_msgs::msg::Marker & marker : rb.markers) {
-      visual_markers_rb.markers.push_back(
-        marker2visual(
-          counter_markers_rb++,
-          marker.translation, msg->header));
+      auto visual_marker = marker2visual(marker_id++, marker.translation, msg->header);
+      visual_marker.ns = rb_namespace;
+      visual_marker.color = color;
+      visual_markers_rb.markers.push_back(visual_marker);
     }
   }
 
@@ -157,19 +165,19 @@ MarkerVisualizer::rb_callback(const mocap4r2_msgs::msg::RigidBodies::SharedPtr m
 
 visualization_msgs::msg::Marker
 MarkerVisualizer::rb2visual(
-  int index, const geometry_msgs::msg::Pose & poserb,
+  const mocap4r2_msgs::msg::RigidBody & rb,
   const std_msgs::msg::Header & header) const
 {
   visualization_msgs::msg::Marker viz_marker;
   viz_marker.header = header;
-  viz_marker.ns = namespace_;
-  viz_marker.color = default_marker_color_;
-  viz_marker.id = index;
+  viz_marker.ns = rigidBodyNamespace(rb.rigid_body_name);
+  viz_marker.color = rigidBodyColor(rb.rigid_body_name);
+  viz_marker.id = 0;
   viz_marker.type = visualization_msgs::msg::Marker::ARROW;
   viz_marker.action = visualization_msgs::msg::Marker::ADD;
 
   // Change mocap system axis to rviz axis
-  viz_marker.pose = mocap2rviz(poserb);
+  viz_marker.pose = mocap2rviz(rb.pose);
 
   geometry_msgs::msg::Vector3 marker_scale_;
   marker_scale_.x = 0.5f;
@@ -178,4 +186,74 @@ MarkerVisualizer::rb2visual(
   viz_marker.scale = marker_scale_;
   viz_marker.lifetime = rclcpp::Duration::from_seconds(marker_lifetime_);
   return viz_marker;
+}
+
+visualization_msgs::msg::Marker
+MarkerVisualizer::rbLabel2visual(
+  const mocap4r2_msgs::msg::RigidBody & rb,
+  const std_msgs::msg::Header & header) const
+{
+  visualization_msgs::msg::Marker label;
+  label.header = header;
+  label.ns = rigidBodyNamespace(rb.rigid_body_name);
+  label.id = 1;
+  label.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+  label.action = visualization_msgs::msg::Marker::ADD;
+  label.pose = mocap2rviz(rb.pose);
+  label.pose.position.z += rigid_body_label_offset_;
+  label.pose.orientation.x = 0.0;
+  label.pose.orientation.y = 0.0;
+  label.pose.orientation.z = 0.0;
+  label.pose.orientation.w = 1.0;
+  label.scale.z = rigid_body_label_height_;
+  label.color = rigidBodyColor(rb.rigid_body_name);
+  label.text = rb.rigid_body_name.empty() ? "unnamed" : rb.rigid_body_name;
+  label.lifetime = rclcpp::Duration::from_seconds(marker_lifetime_);
+  return label;
+}
+
+std_msgs::msg::ColorRGBA
+MarkerVisualizer::rigidBodyColor(const std::string & name) const
+{
+  // FNV-1a gives the same group name the same hue across runs and machines.
+  uint32_t hash = 2166136261u;
+  for (const unsigned char character : name) {
+    hash ^= character;
+    hash *= 16777619u;
+  }
+
+  const float hue = static_cast<float>(hash % 360u) / 60.0f;
+  const float chroma = 0.85f;
+  const float x = chroma * (1.0f - std::fabs(std::fmod(hue, 2.0f) - 1.0f));
+  float red = 0.0f;
+  float green = 0.0f;
+  float blue = 0.0f;
+
+  if (hue < 1.0f) {
+    red = chroma; green = x;
+  } else if (hue < 2.0f) {
+    red = x; green = chroma;
+  } else if (hue < 3.0f) {
+    green = chroma; blue = x;
+  } else if (hue < 4.0f) {
+    green = x; blue = chroma;
+  } else if (hue < 5.0f) {
+    red = x; blue = chroma;
+  } else {
+    red = chroma; blue = x;
+  }
+
+  const float match = 0.95f - chroma;
+  std_msgs::msg::ColorRGBA color;
+  color.r = red + match;
+  color.g = green + match;
+  color.b = blue + match;
+  color.a = default_marker_color_.a;
+  return color;
+}
+
+std::string
+MarkerVisualizer::rigidBodyNamespace(const std::string & name) const
+{
+  return namespace_ + "/rigid_bodies/" + (name.empty() ? "unnamed" : name);
 }

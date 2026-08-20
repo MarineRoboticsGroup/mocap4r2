@@ -11,6 +11,8 @@ The following parameters can be used to configure the visualization:
 * `marker_scale_y` (0.014): y scale of the marker (in meters)
 * `marker_scale_z` (0.014): z scale of the marker (in meters)
 * `marker_lifetime` (0.1): duration for which the marker will be visible after receiving marker data (in seconds)
+* `rigid_body_label_height` (0.12): height of rigid-body name labels in meters
+* `rigid_body_label_offset` (0.15): vertical distance between a rigid body and its name label in meters
 * `marker_frame` (mocap): the origin to which the markers will be rendered relative to, should correspond with the origin used by the mocap system
 * `namespace` (mocap\_markers): namespace attached to the visualized markers
 * `use_markers_with_id` (true): whether to use Marker messages (if false) or MarkerWithId messages (if true). Needs to correspond with the configuration of the motion capture system driver. Currently markers with ID are only supported by the Qualisys driver.
@@ -19,3 +21,7 @@ The following parameters can be used to configure the visualization:
 The `set_marker_color` service changes the marker color based on the marker ID and specified color. Can be used for highlighting markers when using external tools.
 The `reset_marker_color` service resets the color of the marker specified by the marker ID to the default value.
 Both services only work when using MarkerWithId messages.
+
+Rigid bodies are assigned a deterministic color from their `rigid_body_name`. Their arrow,
+tracked markers, and camera-facing name label use that color, so a group remains visually
+consistent even if the order of rigid bodies in the incoming message changes.
