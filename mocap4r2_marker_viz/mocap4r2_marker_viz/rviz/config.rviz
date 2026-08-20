@@ -47,6 +47,13 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
+    - Class: rviz_default_plugins/Axes
+      Enabled: true
+      Length: 0.3
+      Name: Mocap Origin
+      Radius: 0.015
+      Reference Frame: <Fixed Frame>
+      Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: Markers
